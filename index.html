@@ -1,34 +1,208 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Healing Books - 예술로 치유하는 그림책</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Noto+Sans+KR', sans-serif;
-    }
-    .font-serif {
-      font-family: 'Playfair Display', serif;
-    }
-  </style>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="모던 미니멀 그림예언(오라클 카드) 웹 앱 프로토타입" />
+  <title>그림예언 · Oracle Art</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/style.css" />
 </head>
-<body class="bg-slate-50 text-slate-900">
-  <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
+<body>
+  <a class="skip" href="#app">본문으로 건너뛰기</a>
+
+  <header class="topbar">
+    <div class="container topbar__inner">
+      <div class="brand" role="banner">
+        <div class="brand__mark" aria-hidden="true">OA</div>
+        <div class="brand__text">
+          <div class="brand__title">그림예언</div>
+          <div class="brand__subtitle">Oracle Art · Prototype</div>
+        </div>
+      </div>
+
+      <nav class="topbar__nav" aria-label="상단 메뉴">
+        <button class="ghost" id="btnReset" type="button" title="로컬 데이터 초기화">초기화</button>
+        <a class="ghost" href="#help">도움말</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="app" class="container" tabindex="-1">
+    <!-- Landing / Sets -->
+    <section class="panel" id="viewLanding" aria-labelledby="landingTitle">
+      <div class="panel__head">
+        <h1 id="landingTitle" class="h1">세트를 선택하세요</h1>
+        <p class="muted">각 세트는 12장의 그림 카드로 구성되며, <strong>카드별 2회</strong>까지 메시지를 열람할 수 있습니다.</p>
+      </div>
+
+      <div class="sets" id="setList" aria-live="polite"></div>
+
+      <div class="note" id="help">
+        <h2 class="h2">결제/구매 안내(프로토타입)</h2>
+        <ul>
+          <li>현재 버전은 <strong>결제 연동 전</strong> 단계로, “구매하기”는 로컬에서만 잠금 해제됩니다.</li>
+          <li>실서비스에서는 Toss Payments / BootPay / Stripe 등의 결제창을 띄우고, 결제 완료 웹훅(서버)로 구매를 확정합니다.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Set / Grid -->
+    <section class="panel hidden" id="viewSet" aria-labelledby="setTitle">
+      <div class="panel__head row">
+        <div>
+          <button class="ghost" id="btnBack" type="button">← 세트 목록</button>
+          <h1 id="setTitle" class="h1" style="margin-top:10px;">세트</h1>
+          <p class="muted" id="setDesc">카드를 선택하면 메시지가 공개됩니다.</p>
+        </div>
+        <div class="right">
+          <span class="pill" id="purchasePill" aria-live="polite">잠김</span>
+          <button class="primary" id="btnPurchase" type="button">구매하기</button>
+        </div>
+      </div>
+
+      <div class="grid" id="cardGrid" aria-live="polite"></div>
+
+      <div class="foot muted">
+        <div>뷰 제한: 카드별 2회 · 로컬 저장(LocalStorage)</div>
+        <div>이미지/메시지는 데모용 플레이스홀더입니다.</div>
+      </div>
+    </section>
+
+    <!-- Card Modal -->
+    <div class="modal hidden" id="cardModal" role="dialog" aria-modal="true" aria-labelledby="cardModalTitle">
+      <div class="modal__overlay" data-close="true"></div>
+      <div class="modal__sheet" role="document">
+        <div class="modal__head">
+          <div>
+            <div class="kicker" id="cardModalKicker">테마</div>
+            <h2 class="h2" id="cardModalTitle">카드</h2>
+            <p class="muted" id="cardModalCounter">남은 열람: 2/2</p>
+          </div>
+          <button class="icon" type="button" aria-label="닫기" data-close="true">✕</button>
+        </div>
+
+        <div class="modal__body">
+          <div class="cardDetail">
+            <div class="cardDetail__art">
+              <div class="flip" id="flipRoot" aria-label="카드 플립 애니메이션">
+                <div class="flip__inner" id="flipInner">
+                  <div class="flip__face flip__face--front">
+                    <div class="cardBack">
+                      <div class="cardBack__mark">OA</div>
+                      <div class="cardBack__text">Tap to reveal</div>
+                    </div>
+                  </div>
+                  <div class="flip__face flip__face--back">
+                    <img id="cardModalImg" alt="선택한 카드 이미지" />
+                  </div>
+                </div>
+              </div>
+              <button class="ghost" type="button" id="btnReveal">카드 공개</button>
+            </div>
+
+            <div class="cardDetail__content">
+              <article class="message" aria-label="카드 메시지">
+                <div class="message__title">메시지</div>
+                <div class="message__body" id="cardModalMsg"></div>
+              </article>
+
+              <div class="actions">
+                <button class="secondary" id="btnPrintOrder" type="button">인쇄본 주문</button>
+                <button class="ghost" id="btnShare" type="button">공유</button>
+              </div>
+
+              <div class="shareRow hidden" id="shareRow" aria-label="공유 버튼">
+                <button class="chip" data-share="kakao" type="button">카카오톡</button>
+                <button class="chip" data-share="facebook" type="button">Facebook</button>
+                <button class="chip" data-share="twitter" type="button">X(Twitter)</button>
+                <button class="chip" data-share="copy" type="button">링크 복사</button>
+              </div>
+
+              <div class="mini muted" id="paymentHint">
+                결제 연동 준비: 인쇄 주문은 현재 “데모 주문 생성”만 수행합니다.
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Print Order Modal -->
+    <div class="modal hidden" id="printModal" role="dialog" aria-modal="true" aria-labelledby="printModalTitle">
+      <div class="modal__overlay" data-close="true"></div>
+      <div class="modal__sheet" role="document">
+        <div class="modal__head">
+          <div>
+            <div class="kicker">인쇄본 주문</div>
+            <h2 class="h2" id="printModalTitle">배송 정보를 입력해 주세요</h2>
+            <p class="muted" id="printModalSub">결제는 실제 연동 전이며, 주문 정보가 로컬에 저장됩니다.</p>
+          </div>
+          <button class="icon" type="button" aria-label="닫기" data-close="true">✕</button>
+        </div>
+
+        <div class="modal__body">
+          <form id="printForm" class="form">
+            <div class="form__row">
+              <label>
+                <span>성함</span>
+                <input required name="name" autocomplete="name" />
+              </label>
+              <label>
+                <span>연락처</span>
+                <input required name="phone" autocomplete="tel" inputmode="tel" />
+              </label>
+            </div>
+
+            <label>
+              <span>이메일(선택)</span>
+              <input name="email" autocomplete="email" inputmode="email" />
+            </label>
+
+            <label>
+              <span>주소</span>
+              <input required name="address" autocomplete="street-address" />
+            </label>
+
+            <div class="form__row">
+              <label>
+                <span>옵션</span>
+                <select name="size">
+                  <option value="A5">A5 (엽서형)</option>
+                  <option value="A4">A4 (포스터형)</option>
+                </select>
+              </label>
+              <label>
+                <span>수량</span>
+                <input type="number" min="1" value="1" name="qty" />
+              </label>
+            </div>
+
+            <label>
+              <span>요청사항(선택)</span>
+              <textarea name="note" rows="3" placeholder="포장/배송 관련 요청사항"></textarea>
+            </label>
+
+            <div class="form__row">
+              <button class="primary" type="submit">주문 생성(데모)</button>
+              <button class="ghost" type="button" data-close="true">취소</button>
+            </div>
+
+            <p class="mini muted">* 실서비스에서는 결제창(토스/부트페이/스트라이프)을 통해 추가 결제가 진행됩니다.</p>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  </main>
+
+  <script src="js/app.js"></script>
 </body>
 </html>
